@@ -6,10 +6,20 @@
 //
 
 import UIKit
+import Firebase
 
 class MainTabController: UITabBarController {
 
     // MARK: - Properties
+
+    var user:User? {
+        didSet {
+            // viewControllers = [nav1, nav2, nav3, nav4]
+            guard let nav = viewControllers?[0] as? UINavigationController else { return }
+            guard let feed = nav.viewControllers.first as? FeedController else { return }
+            feed.user = user
+        }
+    }
     
     let actionButton: UIButton = {
         let button = UIButton(type: .system)
@@ -24,15 +34,52 @@ class MainTabController: UITabBarController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        
-        configureViewController()
-        configureUI()
+        //logUserOut()
+        view.backgroundColor = .twitterBlue
+        authenticateUserAndConfigureUI()
+    
+    }
+    
+    // MARK: - API
+    func fetchUser() {
+        guard  let uid = Auth.auth().currentUser?.uid else { return }
+        UserService.shared.fetchUser(uid: uid) { (user) in
+            self.user = user
+        }
+    }
+    
+    func authenticateUserAndConfigureUI(){
+        if Auth.auth().currentUser == nil {
+            DispatchQueue.main.async {
+                let nav = UINavigationController(rootViewController: LoginController())
+                nav.modalPresentationStyle = .fullScreen
+                self.present(nav, animated: true, completion: nil)
+            }
+        } else {
+            configureViewController()
+            configureUI()
+            fetchUser()
+        }
+    }
+    
+    func logUserOut() {
+        do {
+            try Auth.auth().signOut()
+            print("DEBUG: Did log user out")
+        } catch let error {
+            print("DEBUG: Failed to sign out with error \(error.localizedDescription)")
+        }
     }
     
     // MARK: - Selectors
     @objc func actionButtonTapped() {
-        print(123)
+        guard let user = user else {
+            return
+        }
+        let controller = UploadTweetController(user: user)
+        let nav = UINavigationController(rootViewController: controller)
+        nav.modalPresentationStyle = .fullScreen
+        present(nav, animated: true, completion: nil)
     }
     
     // MARK: - Helpers
@@ -50,7 +97,7 @@ class MainTabController: UITabBarController {
     }
     
     func configureViewController() {
-        let feed = FeedController()
+        let feed = FeedController(collectionViewLayout: UICollectionViewFlowLayout())
         let nav1 = templateNavigationController(image: UIImage(named: "home_unselected"), rootViewController: feed)
         
         let explore = ExploreController()
